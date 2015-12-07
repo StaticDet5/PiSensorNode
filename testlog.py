@@ -4,7 +4,7 @@ import cPickle as pickle
 import time
 import pygal
 
-centralLog = 'House.bak'
+centralLog = 'House.log'
 
 def lineCount(logName):
     count = 0
@@ -87,15 +87,19 @@ if __name__ == "__main__":
     start=time.time()
     #print logPrint(centralLog)
     #print lineCount(centralLog)
-    workingList = timePull(1449061019, 1449061169, centralLog)
+    currentTime = time.time()
+    workingList = timePull(1449061019, currentTime, centralLog)
     #print DictTimeValuePull(workingList, 'Value')
     #print listValuePull(workingList, 'Value')
     #print LogAttributePull(workingList, 'Temp1')
-    data = listValuePull(LogAttributePull(workingList, 'Temp1'), 'Value')
-    print data
-    bar_chart = pygal.Bar()
-    bar_chart.add('Temp1', data)
-    bar_chart.render_to_png('bar_chart.png')
+    data1 = listValuePull(LogAttributePull(LogAttributePull(workingList, '192.168.1.50'),'Temp1'), 'Value')
+    data2 = listValuePull(LogAttributePull(LogAttributePull(workingList, '192.168.1.211'),'Temp1'), 'Value')
+    #print data
+    line_chart = pygal.Line()
+    line_chart.title = 'Household Temperatures'
+    line_chart.add('Office', data1)
+    line_chart.add('LivingRoom', data2)
+    line_chart.render_to_png('tempOffice_chart3.png')
     end = time.time()
     print end-start
     
