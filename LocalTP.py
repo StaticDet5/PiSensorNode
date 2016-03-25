@@ -3,7 +3,7 @@ import time
 import sensor
 import log
 
-logFile = 'sensor.log'
+logFile = 'Sensor.log'
 interval = 60
 logLevel = 'Info'
 sensor1 = 'Temp1'

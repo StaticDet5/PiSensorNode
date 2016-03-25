@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import time
-import sensor2 as sensor
+import sensor2 as Reading
 import log
 import math
 import os
@@ -16,11 +16,11 @@ validSensors = ['BMP180', 'OLED', 'L3G4200D', 'ADXL345', 'HMC5883L', 'None']
 defaultConfig = {'Node' : 'Default', 'CentralLogIP' : '192.168.1.50', 'I2CBus1' : 'None'}
 logIP = defaultConfig['CentralLogIP']
 
-class myThread (threading.Thread):
-    def __init__(self, threadID, name):
-        threading.Thread.__init__(self)
-        self.threadID = threadID
-        self.name = name
+#class myThread (threading.Thread):
+#    def __init__(self, threadID, name):
+#        threading.Thread.__init__(self)
+#        self.threadID = threadID
+#        self.name = name
 
 
 class Node:
@@ -162,14 +162,49 @@ class Node:
                     
 
 
-    def go(self):     #######################WIP
-        print "Go Initialized!!!!!!!!!!!!!!!!!!!!!"
-        run = True
-        x=0
-        for item in self.sensorList:
-            item.threadedMonitor()
-            print item, " Started!"
-        print "All threads started!"            
+#    def go(self):     #######################WIP   This is suspended until the threading issue can be worked out.
+#        print "Go Initialized!!!!!!!!!!!!!!!!!!!!!"
+#        run = True
+#        x=0
+#        threads = []
+#        for item in self.sensorList:
+#            x=x+1
+#            print item
+#            print "X=",x
+#            #print item.threadedMonitor()
+#            t= threading.Thread(target=item.monitor())
+#            threads.append(t)
+#            #self.threadedMonitor(item.monitor())
+#            
+#            print item, " Appended!"
+#            threads.start()
+#        print "All threads started!"            
+
+    def go(self):
+	run = True
+	for item in self.sensorList:
+		item.listMemory = []
+	startTime = time.time()
+	reportTime = startTime + 15
+	while run == True:
+		for item in self.sensorList:
+			#print item
+			#print item.getValue()
+			item.listMemory.append(item.discreteValue())
+		if time.time() > reportTime:
+			for item in self.sensorList:
+				item.min = min(item.listMemory)
+				item.max = max(item.listMemory)
+				item.avg = (sum(item.listMemory) / float(len(item.listMemory)))
+				data= {'Value' : round(item.listMemory[-1],2), 'Max' : round(item.max,2), 'Min' : round(item.min,2), 'Avg' : round(item.avg,2), 'Len' : len(item.listMemory), 'Sensor' : item.name}
+				self.sendMessage(data)
+				item.listMemory = []
+			reportTime = time.time() + 15
+ 
+				 
+			
+ 		#run = False
+
 
     def pickleMessage(self, data, level = 'Info'): #take a message dict, add the baseMessage, pickle, return
         baseMessage = {'Time' : time.time(), 'Node': self.name, 'Level' : level}
@@ -202,6 +237,11 @@ class Node:
             logIP = self.logIP
         log.log2net(package, logIP)
 
+    def threadedMonitor(self, threadToRun, run=True, memorySize = 60000):
+        t = threading.Thread(target=threadToRun)
+        threads.append(t)
+        t.start()
+
         
 class Sensor:
     count = 0
@@ -223,99 +263,99 @@ class Sensor:
         self.minValue = minValue
         self.maxValue = maxValue
         self.report = report
+        self.logIP = logIP   ###Write a check here
+        self.baseMessage = {'Sensor' : self.name, 'Type' : self.valueType, 'Units' : self.units}
+        Sensor.count += 1
 
         ######  Begin setting up sensors  ########
-
+    def baseValue(self):
+        if self.name == 'BMP180f':
+            value = Reading.BMP180f()
+        elif self.name == 'BMP180p':
+            value = Reading.BMP180p()
+        elif self.name == 'ADXL345x':
+            value = Reading.ADXL345X()
+        elif self.name == 'ADXL345y':
+            value = Reading.ADXL345Y()
+        elif self.name == 'ADXL345z':
+            value = Reading.ADXL345Z()
+        return value
 
         
-        self.logIP = logIP   ###Write a check here
-        #self.baseMessage = {'Sensor' : self.name, 'Type' : self.valueType, 'Units' : self.units}
-        Sensor.count += 1
-    def baseMessage(self):
-        self.base = {'Sensor' : self.name, 'Type' : self.valueType, 'Units' : self.units}
-        return self.base
+        
+    #def baseMessage(self):
+    #    self.base = {'Sensor' : self.name, 'Type' : self.valueType, 'Units' : self.units}
+    #    return self.base
       
     def getValue(self):    ## returns a dictionary, used for reporting outside of the sensor, typically to the Node and beyond
-        if self.name == 'BMP180f':
-            self.value = sensor.BMP180f()
-        elif self.name == 'BMP180p':
-            self.value = sensor.BMP180p()
-        elif self.name == 'ADXL345x':
-            self.value = sensor.ADXL345X()
-        elif self.name == 'ADXL345y':
-            self.value = sensor.ADXL345Y()
-        elif self.name == 'ADXL345z':
-            self.value = sensor.ADXL345Z()
+        value = self.baseValue()
         if self.minValue != None:
-            if self.value < self.minValue:
-                self.data={'Level' : 'Critical', 'Value' : self.value}
-                self.data.update(self.baseMessage())
-                self.nodeName.sendMessage(self.data)
+            if value < self.minValue:
+                data={'Level' : 'Critical', 'Value' : value}
+                data.update(self.baseMessage)
+                self.nodeName.sendMessage(data)
         if self.maxValue != None:
-            if self.value > self.maxValue:
-                self.data={'Level' : 'Critical', 'Value' : self.value}
-                self.data.update(self.baseMessage())
-                self.nodeName.sendMessage(self.data)
+            if value > self.maxValue:
+                data={'Level' : 'Critical', 'Value' : value}
+                data.update(self.baseMessage)
+                self.nodeName.sendMessage(data)
         
-        self.data = self.baseMessage()
-        self.data['Value'] = self.value
-        return self.data
+        data = self.baseMessage
+        data['Value'] = value
+        return data
 
     def discreteValue(self):   ## returns only a value
-        if self.name == 'BMP180f':
-            self.value = sensor.BMP180f()
-        elif self.name == 'BMP180p':
-            self.value = sensor.BMP180p()
-        elif self.name == 'ADXL345x':
-            self.value = sensor.ADXL345X()
-        elif self.name == 'ADXL345y':
-            self.value = sensor.ADXL345Y()
-        elif self.name == 'ADXL345z':
-            self.value = sensor.ADXL345Z()
+        value = self.baseValue()
         if self.minValue != None:
-            if self.value < self.minValue:
-                self.data={'Level' : 'Critical', 'Value' : self.value}
-                self.data.update(self.baseMessage())
-                self.nodeName.sendMessage(self.data)
+            if value < self.minValue:
+                data={'Level' : 'Critical', 'Value' : value}
+                data.update(self.baseMessage)
+                self.nodeName.sendMessage(data)
         if self.maxValue != None:
-            if self.value > self.maxValue:
-                self.data={'Level' : 'Critical', 'Value' : self.value}
-                self.data.update(self.baseMessage())
-                self.nodeName.sendMessage(self.data)
-        return self.value
+            if value > self.maxValue:
+                data={'Level' : 'Critical', 'Value' : value}
+                data.update(self.baseMessage)
+                self.nodeName.sendMessage(data)
+        return value
         
     def monitor(self, run=True, memorySize = 60000):
-        self.sensorMemory = []
-        self.reportTime = time.time()
-        self.nextReport = self.reportTime + self.interval
-        self.singleValue = self.discreteValue()
-        self.memorySize = memorySize
-        self.runningTotal = 0
+        sensorMemory = []
+        reportTime = time.time()
+        nextReport = reportTime + self.interval
+        singleValue = self.discreteValue()
+        runningTotal = 0
         x=0
+        print nextReport, reportTime, self.interval
         while run==True:
-            self.intervalTime = time.time()
+            intervalTime = time.time()
             x=x+1
-            self.runningTotal = self.runningTotal + self.singleValue
-            if len(self.sensorMemory) > self.memorySize:
-                self.runningTotal = self.runningTotal - self.sensorMemory[0]
-                del self.sensorMemory[0]
-            self.singleValue = self.discreteValue()
-            self.sensorMemory.append(self.singleValue)
-            if self.intervalTime > self.reportTime:
-                self.reportTime = (time.time() + self.interval)
-                self.dataMin = min(self.sensorMemory)
-                self.dataMax = max(self.sensorMemory)
-                self.dataAvg = (sum(self.runningTotal[-x:] / x)
+            runningTotal = runningTotal + singleValue
 
-                self.data={'Value': self.singleValue, 'Min': self.dataMin, 'Max' : self.dataMax, 'Avg' : self.dataAvg}
-                self.data.update(self.baseMessage())
-                self.nodeName.sendMessage(self.data)
+            singleValue = self.discreteValue()
+            sensorMemory.append(singleValue)
+            if len(sensorMemory) > memorySize:
+                runningTotal = runningTotal - sensorMemory[0]
+                del sensorMemory[0]
+            #print singleValue
+            if intervalTime > reportTime:
+                reportTime = (time.time() + self.interval)
+                dataMin = min(sensorMemory)
+                dataMax = max(sensorMemory)
+                #print type(runningTotal)
+                #print runningTotal
+                subsample = sensorMemory[-x:]
+                #print subsample
+                print sum(subsample), len(sensorMemory)
+                
+                dataAvg = round((sum(subsample)) / (len(sensorMemory[-x:])), 2)
+
+                data={'Value': singleValue, 'Min': dataMin, 'Max' : dataMax, 'Avg' : dataAvg}
+                data.update(self.baseMessage)
+                self.nodeName.sendMessage(data)
                 x=0
                                
             
-    def threadedMonitor(self, run=True, memorySize = 60000):
-        self.t = threading.Thread(target=self.monitor)
-        self.t.start()
+
         
         
         

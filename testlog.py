@@ -53,6 +53,37 @@ def timePull(pulltime1, pulltime2, centralLog):  #returns a list of loglines (wh
     logFile.close()
     return workingLog
 
+def scaledTimePull(pulltime1, pulltime2, centralLog, scale):  #returns a scaled list of loglines (which are dictionaries), needs a rewrite
+    if pulltime2 < pulltime1:
+        placeholder = pulltime1
+        pulltime1 = pulltime2
+        pulltime2 = placeholder
+    #count = lineCount(centralLog)
+    logFile = open(centralLog, 'r')
+    
+    workingLog = []
+   # print int(pulltime1), int(pulltime2), scale, count
+    for i in range(int(pulltime1), int(pulltime2), scale):
+        #print i, int(pulltime1), int(pulltime2), scale, count
+        if i < int(pulltime2):
+            #print i, int(pulltime2)
+            try:
+                logLine = pickle.load(logFile)
+            except:
+                #print "Skipped at", int(i)
+                pass
+            #print logLine
+            #print str(pulltime1) + " " + str(logLine['Time']) + " " + str(pulltime2) 
+            if float(pulltime1) <= logLine['Time']:
+            
+                if float(pulltime2) >= logLine['Time']:
+                    workingLog.append(logLine)
+        else:
+            break
+                
+    logFile.close()
+    return workingLog
+
 def listValuePull(listName, attribute):  #returns a list of attribute values
     pulledList = []
     if type(listName) != type(pulledList):
@@ -82,18 +113,25 @@ def LogAttributePull(listName, attribute): #returns a list of dictionaries that 
             pulledList.append(item)
 
     return pulledList
+
+def TwoKeyPull(listName, key1, key2):  # returns a list from dictionaries (log lines) that have match two keys.  IE:  Pull "Temperature" from "Office" lines from log dictionary
+    pulledList = []
+    if type(listName) != type(pulledList):
+        print 'Invalid list'
+    data = listValuePull(LogAttributePull(LogAttributePull(workingList, key1),key2), 'Value')
+    return data
     
 if __name__ == "__main__":
     start=time.time()
     #print logPrint(centralLog)
     #print lineCount(centralLog)
     currentTime = time.time()
-    workingList = timePull(1449061019, currentTime, centralLog)
+    workingList = scaledTimePull(1449061019, (currentTime-10) , centralLog, 30)
     #print DictTimeValuePull(workingList, 'Value')
     #print listValuePull(workingList, 'Value')
     #print LogAttributePull(workingList, 'Temp1')
     data1 = listValuePull(LogAttributePull(LogAttributePull(workingList, '192.168.1.50'),'Temp1'), 'Value')
-    data2 = listValuePull(LogAttributePull(LogAttributePull(workingList, '192.168.1.211'),'Temp1'), 'Value')
+    data2 = TwoKeyPull(workingList, '192.168.1.211','Temp1')
     #print data
     line_chart = pygal.Line()
     line_chart.title = 'Household Temperatures'
